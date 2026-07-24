@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="GymTracker">
   <link rel="apple-touch-icon" href="icon-192.png">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>GYM TRACKER</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -308,7 +308,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* BOTTOM NAV */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(12,12,12,.97);backdrop-filter:blur(12px);border-top:1px solid var(--border);display:flex;padding:8px 16px 14px;gap:4px;z-index:100}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(12,12,12,.97);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--border);display:flex;padding:8px 16px env(safe-area-inset-bottom, 14px);gap:4px;z-index:100}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px;border-radius:8px;cursor:pointer;border:none;background:none;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.4px;transition:all .2s}
 .nav-btn:hover,.nav-btn.active{color:var(--acc)}
 
@@ -337,6 +337,83 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 /* SCREENS */
 .screen{display:none}
 .screen.active{display:block}
+
+/* ── MOBILE OPTIMIZATIONS ── */
+@media (max-width: 768px) {
+  /* Larger touch targets */
+  .nav-btn { padding: 8px 4px 10px; min-height: 52px; }
+  .nav-icon { font-size: 22px; }
+  .nav-btn { font-size: 9px; }
+  
+  /* Bottom nav safe area for iPhone */
+  .bottom-nav { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  
+  /* Main content padding for bottom nav */
+  .screen { padding-bottom: 90px !important; }
+  
+  /* Bigger inputs on mobile */
+  .sinput { font-size: 16px !important; padding: 10px 8px !important; min-height: 44px; }
+  .sinput::placeholder { font-size: 14px; }
+  .chk-btn { width: 40px !important; height: 40px !important; font-size: 18px !important; border-radius: 10px !important; }
+  
+  /* Set row bigger */
+  .set-row { padding: 10px 12px !important; gap: 6px !important; }
+  .set-grid-head { padding: 8px 12px 4px !important; }
+  .snum { font-size: 13px; font-weight: 600; }
+  
+  /* Food inputs */
+  .food-inp { font-size: 16px !important; padding: 10px 8px !important; min-height: 44px; }
+  .food-row { padding: 10px 12px 4px !important; }
+  .food-row-macros { padding: 4px 12px 10px !important; }
+  
+  /* Exercise cards */
+  .ex-header { padding: 14px 12px !important; min-height: 52px; }
+  .ex-name-display { font-size: 15px !important; }
+  
+  /* Buttons bigger */
+  .btn-sm { padding: 8px 12px !important; font-size: 12px !important; min-height: 36px; }
+  .finish-day-btn { padding: 10px 16px !important; font-size: 12px !important; min-height: 40px; }
+  .auth-btn { padding: 16px !important; font-size: 16px !important; min-height: 52px; }
+  .auth-input { font-size: 16px !important; padding: 14px !important; min-height: 52px; }
+  
+  /* Week grid */
+  .wday { min-height: 70px; }
+  .wday-name { font-size: 10px; }
+  
+  /* Profile inputs */
+  .prof-input { font-size: 16px !important; padding: 12px !important; min-height: 48px; }
+  
+  /* Prevent zoom on input focus */
+  input, select, textarea { font-size: 16px !important; }
+  
+  /* Admin banner scroll */
+  .admin-tabs { -webkit-overflow-scrolling: touch; }
+  
+  /* Day head buttons */
+  .day-head-right { gap: 4px !important; flex-wrap: wrap; justify-content: flex-end; }
+  
+  /* Rest timer */
+  #restTimer { bottom: 80px !important; }
+  
+  /* Meal cards */
+  .meal-head { padding: 14px 12px !important; min-height: 52px; }
+}
+
+/* iPhone notch/dynamic island */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .main-header { padding-top: max(12px, env(safe-area-inset-top)); }
+}
+
+/* Prevent text selection on buttons */
+.nav-btn, .chk-btn, .btn, .auth-btn, .finish-day-btn, .goal-btn, .muscle-btn {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth scrolling */
+.screen { -webkit-overflow-scrolling: touch; }
+
 </style>
 </head>
 <body>
