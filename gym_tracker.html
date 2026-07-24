@@ -3101,9 +3101,9 @@ async function handleHashParams() {
   const refreshToken = params.get('refresh_token');
 
   if(type === 'recovery' && accessToken) {
-    // Password reset flow - block auto-login
+    // Password reset flow - set session temporarily just for password update
     isResettingPassword = true;
-    await sb.auth.setSession({access_token: accessToken, refresh_token: refreshToken});
+    window._resetTokens = {access_token: accessToken, refresh_token: refreshToken};
     showResetPasswordUI();
     return;
   }
@@ -3116,6 +3116,7 @@ async function handleHashParams() {
 }
 
 function showResetPasswordUI() {
+  // Don't set session yet - wait until user actually submits new password
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('authScreen').style.display = 'block';
   document.getElementById('loginForm').style.display = 'none';
@@ -3140,6 +3141,11 @@ async function doResetPassword() {
   if(p1 !== p2) return showAuthErr('Şifreler eşleşmiyor');
   const btn = document.querySelector('#resetForm .auth-btn');
   btn.disabled = true; btn.textContent = 'Güncelleniyor...';
+  // Set session only now, right before updating password
+  if(window._resetTokens){
+    await sb.auth.setSession(window._resetTokens);
+    window._resetTokens = null;
+  }
   const {error} = await sb.auth.updateUser({password: p1});
   if(error) { showAuthErr(error.message); btn.disabled=false; btn.textContent='Şifreyi Güncelle'; return; }
   document.getElementById('resetForm').remove();
