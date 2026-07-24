@@ -666,6 +666,7 @@ async function saveProgram(userId) {
 }
 
 async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
+  if(!userId) return; // Guard against null user
   const k = userId+'_'+dayIdx+'_'+exIdx+'_'+setIdx;
   if(!setCache[k]) setCache[k] = {};
   Object.assign(setCache[k], fields);
@@ -737,6 +738,14 @@ function renderAdminTabs() {
 async function switchViewUser(userId) {
   const p = allProfiles.find(x => x.id === userId);
   if(!p) return;
+  // Clear previous user's cache to prevent data leak
+  const prevId = viewingProfile?.id;
+  if(prevId && prevId !== userId){
+    // Clear setCache for previous user
+    Object.keys(setCache).forEach(k => { if(k.startsWith(prevId)) delete setCache[k]; });
+    // Clear nutCache for previous user  
+    Object.keys(nutCache).forEach(k => { if(k.startsWith(prevId)) delete nutCache[k]; });
+  }
   viewingProfile = p;
   if(!programs[userId]) await loadProgramForUser(userId);
   await loadSessionLogs(userId);
