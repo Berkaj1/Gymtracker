@@ -1893,9 +1893,13 @@ function showScreen(name,btn){
 }
 
 // ── AUTH LISTENER ──
+let isResettingPassword = false; // Flag to prevent auto-login during reset
+
 sb.auth.onAuthStateChange((event, session) => {
-  if(event==='SIGNED_IN'&&session&&!currentUser){
+  if(event==='SIGNED_IN'&&session&&!currentUser&&!isResettingPassword){
     currentUser=session.user;loadProfile();
+  } else if(event==='PASSWORD_RECOVERY'){
+    isResettingPassword = true; // Block auto-login during reset
   } else if(event==='SIGNED_OUT'){
     currentUser=null;currentProfile=null;
     document.getElementById('mainApp').style.display='none';
@@ -3097,7 +3101,8 @@ async function handleHashParams() {
   const refreshToken = params.get('refresh_token');
 
   if(type === 'recovery' && accessToken) {
-    // Password reset flow
+    // Password reset flow - block auto-login
+    isResettingPassword = true;
     await sb.auth.setSession({access_token: accessToken, refresh_token: refreshToken});
     showResetPasswordUI();
     return;
@@ -3143,6 +3148,7 @@ async function doResetPassword() {
   document.querySelector('.auth-sub').textContent = 'Kişisel fitness & beslenme takibi';
   showAuthErr('✅ Şifre güncellendi! Şimdi giriş yapabilirsin.');
   document.querySelector('.auth-err').style.color = 'var(--acc)';
+  isResettingPassword = false;
   window.history.replaceState(null, '', window.location.pathname);
 }
 
