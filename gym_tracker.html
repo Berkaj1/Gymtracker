@@ -488,7 +488,13 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
       <div class="badge" id="clockBadge">--:--</div>
       <div class="badge streak" id="streakBadge">🔥 0 antrenman</div>
       <div class="user-badge" id="userBadge">
-        <div class="user-avatar" id="userAvatar" style="background:rgba(212,245,60,0.15);color:#d4f53c">?</div>
+        <div class="user-avatar" id="userAvatar" style="background:rgba(212,245,60,0.15);color:#d4f53c"><svg viewBox="0 0 40 40" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+  <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
+  <rect x="6" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
+  <rect x="29" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
+  <rect x="3" y="15" width="4" height="10" rx="2" fill="currentColor"/>
+  <rect x="33" y="15" width="4" height="10" rx="2" fill="currentColor"/>
+</svg></div>
         <span class="user-name" id="userName">...</span>
         <button class="logout-btn" onclick="logout()">çıkış</button>
       </div>
@@ -961,7 +967,13 @@ function renderProfile(p) {
   if(!p) return;
   const color = p.color||'#d4f53c', bg = `rgba(212,245,60,0.12)`;
   document.getElementById('profileCard').innerHTML = `
-    <div class="p-av-big" style="background:${bg};color:${color}">${(p.name||'?')[0].toUpperCase()}</div>
+    <div class="p-av-big" style="background:${bg};color:${color}"><svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+  <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
+  <rect x="6" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
+  <rect x="29" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
+  <rect x="3" y="15" width="4" height="10" rx="2" fill="currentColor"/>
+  <rect x="33" y="15" width="4" height="10" rx="2" fill="currentColor"/>
+</svg></div>
     <div style="flex:1;min-width:0">
       <h3 style="font-size:14px;font-weight:600">${p.name||'İsimsiz'}</h3>
       <p style="font-size:11px;color:var(--muted);margin-top:1px">${p.weight||'—'} kg</p>
