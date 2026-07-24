@@ -1,4 +1,4 @@
-tip:"",<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -361,6 +361,9 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
         <div class="auth-field"><label>E-posta</label><input class="auth-input" id="loginEmail" type="email" placeholder="ornek@email.com"></div>
         <div class="auth-field"><label>Şifre</label><input class="auth-input" id="loginPassword" type="password" placeholder="••••••••"></div>
         <button class="auth-btn" onclick="login()">Giriş Yap</button>
+        <div style="text-align:center;margin-top:10px">
+          <button onclick="showForgotPassword()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline">Şifremi unuttum</button>
+        </div>
       </div>
       <div id="registerForm" style="display:none">
         <div class="auth-field"><label>Ad Soyad</label><input class="auth-input" id="regName" type="text" placeholder="Ece Yılmaz"></div>
@@ -3052,8 +3055,7 @@ async function doResetPassword() {
 }
 
 handleHashParams();
-</script>
-  <script>
+
     if('serviceWorker' in navigator){
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')
@@ -3061,6 +3063,6 @@ handleHashParams();
           .catch(e => console.log('SW failed:', e));
       });
     }
-  </script>
+</script>
 </body>
 </html>
