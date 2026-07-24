@@ -3069,6 +3069,49 @@ async function doResetPassword() {
   window.history.replaceState(null, '', window.location.pathname);
 }
 
+
+function showForgotForm(){
+  document.getElementById('loginForm').style.display='none';
+  document.getElementById('forgotForm').style.display='block';
+  const le=document.getElementById('loginEmail');
+  const fe=document.getElementById('forgotEmail');
+  if(le&&fe) fe.value=le.value||'';
+  document.getElementById('authErr').classList.remove('show');
+  setTimeout(()=>fe&&fe.focus(),100);
+}
+
+function showLoginForm(){
+  const ff=document.getElementById('forgotForm');
+  if(ff) ff.style.display='none';
+  document.getElementById('loginForm').style.display='block';
+  document.getElementById('authErr').classList.remove('show');
+}
+
+async function sendResetEmail(){
+  const email=(document.getElementById('forgotEmail').value||'').trim();
+  if(!email){showAuthErr('E-posta adresinizi girin.');return;}
+  const btn=document.getElementById('forgotBtn');
+  btn.disabled=true; btn.textContent='Gönderiliyor...';
+  const {error}=await sb.auth.resetPasswordForEmail(email,{
+    redirectTo:'https://berkaysimsek22.github.io/Gymtracker/gym_tracker.html'
+  });
+  btn.disabled=false;
+  if(error){
+    btn.textContent='Sıfırlama Maili Gönder';
+    showAuthErr('Hata: '+error.message);
+  } else {
+    btn.textContent='✅ Mail Gönderildi!';
+    btn.style.background='#34d399'; btn.style.color='#0c0c0c';
+    document.getElementById('authErr').style.color='#34d399';
+    showAuthErr('Mailinizi kontrol edin. Spam klasörüne de bakın!');
+    setTimeout(()=>{
+      btn.textContent='Sıfırlama Maili Gönder';
+      btn.style.background=''; btn.style.color='';
+      showLoginForm();
+    },4000);
+  }
+}
+
 handleHashParams();
 
     if('serviceWorker' in navigator){
