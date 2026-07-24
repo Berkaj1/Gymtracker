@@ -529,7 +529,7 @@ function todayStr() { return new Date().toISOString().split('T')[0]; }
 function dc(o) { return JSON.parse(JSON.stringify(o)); }
 function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
 function activeProfile() { return viewingProfile || currentProfile; }
-function activeProgram() { return programs[activeProfile()?.id] || DEFAULT_PROGRAM; }
+function activeProgram() { return programs[activeProfile()?.id] || []; }
 
 // ── AUTH ──
 function switchAuthTab(tab) {
@@ -782,6 +782,7 @@ let weekOffset = 0; // 0 = this week, -1 = last week, +1 = next week
 
 function renderWeekGrid() {
   const prog = activeProgram();
+  if(!prog) return;
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const today = new Date().getDay();
   // Check which program days have been completed (by day_name match)
@@ -840,9 +841,15 @@ function renderWeekGrid() {
     </div>`;
   }).join('');
 }
-function selDW(i){curDay=i;showScreen('workout',document.querySelector('.nav-btn'));renderAll();}
+function selDW(i){
+  curDay=i;
+  showScreen('workout',document.querySelector('.nav-btn'));
+  renderWeekGrid();
+  renderDayContent(curDay);
+}
 
 function renderProfile(p) {
+  if(!p) return;
   const color = p.color||'#d4f53c', bg = `rgba(212,245,60,0.12)`;
   document.getElementById('profileCard').innerHTML = `
     <div class="p-av-big" style="background:${bg};color:${color}">${(p.name||'?')[0].toUpperCase()}</div>
