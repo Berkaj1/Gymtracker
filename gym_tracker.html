@@ -487,6 +487,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div class="header-right">
       <div class="badge" id="clockBadge">--:--</div>
       <div class="badge streak" id="streakBadge">🔥 0 antrenman</div>
+      <button onclick="hardRefresh()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent" title="Güncelle">↻</button>
       <div class="user-badge" id="userBadge">
         <div class="user-avatar" id="userAvatar" style="background:rgba(212,245,60,0.15);color:#d4f53c"><svg viewBox="0 0 40 40" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
   <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
@@ -3297,6 +3298,18 @@ async function doModalPasswordReset(){
     btn.textContent = '✅ Şifre güncellendi!';
     setTimeout(()=>document.getElementById('pwdModal')?.remove(), 2000);
   }
+}
+
+
+function hardRefresh(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      regs.forEach(r=>r.unregister());
+    });
+  }
+  caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).finally(()=>{
+    window.location.reload(true);
+  });
 }
 
 handleHashParams();
