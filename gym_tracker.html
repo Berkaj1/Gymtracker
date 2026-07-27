@@ -338,6 +338,55 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .screen{display:none}
 .screen.active{display:block}
 
+/* ── NUTRITION MOBILE ── */
+.meal-card{border-radius:14px;margin-bottom:10px}
+.meal-head{padding:14px 14px;min-height:52px}
+.meal-cals{font-size:13px;font-weight:700}
+.add-food-btn{min-height:44px;font-size:13px;border-radius:10px;padding:12px}
+.food-row{padding:10px 12px 4px;gap:6px}
+.food-row-macros{padding:4px 12px 10px;gap:6px}
+.food-inp{min-height:44px;font-size:16px;border-radius:8px;padding:10px 8px}
+.food-inp.num{font-size:15px;font-weight:600;text-align:center}
+.ms-head h3{font-size:13px}
+.nut-section{padding:14px}
+.macro-box{padding:14px 10px;border-radius:12px}
+.mv{font-size:28px}
+.ml{font-size:10px;margin-top:2px}
+.mp{font-size:10px}
+.cv{font-size:42px}
+.water-btn{width:36px;height:36px;font-size:20px;border-radius:10px}
+
+/* ── PROFILE MOBILE ── */
+.prof-section{border-radius:14px;padding:18px 16px;margin-bottom:10px}
+.prof-section h3{font-size:12px;margin-bottom:14px}
+.prof-input{min-height:48px;font-size:16px;border-radius:10px;padding:12px 14px}
+.prof-field{margin-bottom:14px}
+.prof-field label{font-size:11px;margin-bottom:6px}
+.goal-btn{min-height:64px;border-radius:12px;padding:10px 8px}
+.muscle-btn{min-height:48px;border-radius:10px;font-size:12px;padding:10px 6px}
+.goals-grid{gap:8px;margin-bottom:10px}
+.muscle-grid{gap:8px}
+.prog-suggestion{border-radius:12px;padding:16px}
+.prog-day-row{padding:8px 0;font-size:12px}
+.prof-row{gap:10px}
+
+/* ── HISTORY MOBILE ── */
+.hist-card{border-radius:14px;padding:16px;margin-bottom:10px}
+.hc-day{font-size:15px;font-weight:700}
+.hc-date{font-size:12px;margin-top:3px}
+.hc-stats{margin-top:10px;gap:12px}
+.hcs{font-size:12px}
+.hcs strong{font-size:16px}
+
+/* ── STATS MOBILE ── */
+.stat-card{padding:18px 16px;border-radius:14px}
+.sc-lbl{font-size:10px;letter-spacing:.8px;margin-bottom:8px}
+.sc-val{font-size:36px}
+.sc-sub{font-size:11px;margin-top:4px}
+.pr-item{padding:12px 0;gap:8px}
+.pr-ex{font-size:13px}
+.pr-v{font-size:16px;font-weight:700}
+
 /* ── MOBILE OPTIMIZATIONS ── */
 @media (max-width: 768px) {
   /* Larger touch targets */
@@ -487,7 +536,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div class="header-right">
       <div class="badge" id="clockBadge">--:--</div>
       <div class="badge streak" id="streakBadge">🔥 0 antrenman</div>
-      <button onclick="hardRefresh()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent" title="Güncelle">↻</button>
+      <button onclick="hardRefresh()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:16px;cursor:pointer;padding:6px 10px;-webkit-tap-highlight-color:transparent;line-height:1">↻</button>
       <div class="user-badge" id="userBadge">
         <div class="user-avatar" id="userAvatar" style="background:rgba(212,245,60,0.15);color:#d4f53c"><svg viewBox="0 0 40 40" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
   <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
@@ -654,15 +703,22 @@ function showAuthErr(msg) {
   el.textContent = msg; el.classList.add('show');
 }
 
+let _loginBusy = false;
 async function login() {
+  if(_loginBusy) return;
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   if(!email||!password) return showAuthErr('E-posta ve şifre gerekli');
+  _loginBusy = true;
   const btn = document.querySelector('#loginForm .auth-btn');
   btn.disabled = true; btn.textContent = 'Giriş yapılıyor...';
-  const {error} = await sb.auth.signInWithPassword({email, password});
-  btn.disabled = false; btn.textContent = 'Giriş Yap';
-  if(error) showAuthErr('Hatalı e-posta veya şifre');
+  const {data, error} = await sb.auth.signInWithPassword({email, password});
+  if(error){
+    _loginBusy = false;
+    btn.disabled = false; btn.textContent = 'Giriş Yap';
+    showAuthErr('Hatalı e-posta veya şifre');
+  }
+  // On success, onAuthStateChange handles the rest, _loginBusy stays true
 }
 
 async function register() {
@@ -1930,6 +1986,7 @@ let isResettingPassword = false; // Flag to prevent auto-login during reset
 
 sb.auth.onAuthStateChange((event, session) => {
   if(event==='SIGNED_IN'&&session&&!currentUser&&!isResettingPassword){
+    _loginBusy = false;
     currentUser=session.user;loadProfile();
   } else if(event==='PASSWORD_RECOVERY'){
     isResettingPassword = true; // Block auto-login during reset
