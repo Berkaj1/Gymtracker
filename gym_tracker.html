@@ -1019,7 +1019,7 @@ async function renderDayContent(di) {
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
       ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
-      ${sessionCache.some(s=>s.day_name===day.name)?
+      ${isDayDoneThisWeek(day.name)?
         '<button class="finish-day-btn" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399;cursor:default">✓ Tamamlandı</button>':
         '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
       }
@@ -1291,6 +1291,20 @@ async function clearDaySets(di){
   // clear cache
   Object.keys(setCache).filter(k=>k.startsWith(`${uid}_${di}_`)).forEach(k=>delete setCache[k]);
   renderDayContent(di);
+}
+
+
+function isDayDoneThisWeek(dayName){
+  const now = new Date();
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
+  mon.setHours(0,0,0,0);
+  const nextMon = new Date(mon);
+  nextMon.setDate(mon.getDate()+7);
+  return sessionCache.some(s=>{
+    const d = new Date(s.logged_at);
+    return s.day_name===dayName && d>=mon && d<nextMon;
+  });
 }
 
 function confirmFinishDay(di){
@@ -2142,8 +2156,31 @@ function showDayMuscleMap(di){
   if(!prog||prog.type==='rest')return;
   const allMuscles=new Set();
   prog.exercises.forEach(ex=>{
-    const found=EXERCISE_DB.find(e=>e.name===ex.name);
-    if(found)found.muscles.forEach(m=>allMuscles.add(m));
+    const exName=(ex.name||'').toLowerCase().trim();
+    const found=EXERCISE_DB.find(e=>
+      e.name.toLowerCase()===exName ||
+      e.name.toLowerCase().includes(exName) ||
+      exName.includes(e.name.toLowerCase())
+    );
+    if(found) found.muscles.forEach(m=>allMuscles.add(m));
+    else if(ex.muscle){
+      // Fallback: map muscle text to muscle IDs
+      const m=ex.muscle.toLowerCase();
+      if(m.includes('glute max')) allMuscles.add('glute_max');
+      if(m.includes('glute med')) allMuscles.add('glute_med');
+      if(m.includes('quad')) allMuscles.add('quad');
+      if(m.includes('hamstring')) allMuscles.add('hamstring');
+      if(m.includes('chest')||m.includes('pectoral')) allMuscles.add('chest');
+      if(m.includes('lat')) allMuscles.add('lat');
+      if(m.includes('mid back')||m.includes('rhomboid')||m.includes('trap')) allMuscles.add('mid_back');
+      if(m.includes('front delt')||m.includes('anterior')) allMuscles.add('front_delt');
+      if(m.includes('side delt')||m.includes('lateral delt')) allMuscles.add('side_delt');
+      if(m.includes('rear delt')||m.includes('posterior')) allMuscles.add('rear_delt');
+      if(m.includes('bicep')) allMuscles.add('biceps');
+      if(m.includes('tricep')) allMuscles.add('triceps');
+      if(m.includes('abs')||m.includes('core')||m.includes('karın')) allMuscles.add('abs');
+      if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) allMuscles.add('calves');
+    }
   });
   showMuscleVisual([...allMuscles]);
 }
