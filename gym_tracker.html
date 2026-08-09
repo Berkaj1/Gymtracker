@@ -770,6 +770,8 @@ async function loadProfile() {
   }
   currentProfile = prof;
   viewingProfile = prof;
+  loadCustomFoodDB(currentProfile.id);
+  try{ currentProfile.splitType = localStorage.getItem('splitType_'+currentProfile.id) || null; }catch(e){ console.error('splitType load error:', e); }
 
   // Admin: load all profiles
   if(isAdmin()) {
@@ -1158,7 +1160,12 @@ function buildExCard(ex, di, ei) {
   </div>
   <div class="set-area">
     <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div></div></div>
-    ${setRows}${editArea}
+    ${setRows}
+    ${canEdit()?`<div style="display:flex;gap:6px;padding:6px 14px 4px">
+      <button class="btn btn-outline btn-sm" style="flex:1" onclick="addSetToEx('${uid}',${di},${ei})">+ Set Ekle</button>
+      ${ex.sets>1?`<button class="btn btn-outline btn-sm" style="flex:1;color:var(--acc2)" onclick="removeSetFromEx('${uid}',${di},${ei})">− Son Seti Sil</button>`:''}
+    </div>`:''}
+    ${editArea}
     <div class="ex-notes"><label>Egzersiz Notu</label>
       <textarea rows="1" placeholder="Genel not..." oninput="qSave('${uid}',${di},${ei},-1,'note',this.value)">${(setCache['exn_'+uid+'_'+di+'_'+ei]||'')}</textarea>
     </div>
@@ -1196,41 +1203,30 @@ async function toggleSet(uid,di,ei,si,rs){
 }
 
 
-function addExtraSet(uid, di, ei){
-  const prog = activeProgram();
-  if(!prog[di]||!prog[di].exercises[ei]) return;
-  const ex = prog[di].exercises[ei];
+async function addSetToEx(uid, di, ei){
+  const ex = activeProgram()[di]?.exercises[ei];
+  if(!ex) return;
   ex.sets += 1;
+  await saveProgram(uid);
+  renderDayContent(di);
+}
+
+async function removeSetFromEx(uid, di, ei){
+  const ex = activeProgram()[di]?.exercises[ei];
+  if(!ex || ex.sets<=1) return;
+  if(!confirm('Son set silinsin mi?')) return;
   const si = ex.sets - 1;
   const k = uid+'_'+di+'_'+ei+'_'+si;
-  const card = document.getElementById('ec_'+di+'_'+ei);
-  if(!card) return;
-  const setArea = card.querySelector('.set-area');
-  if(!setArea) return;
-  const newRow = document.createElement('div');
-  newRow.className = 'set-row';
-  newRow.id = 'sr_'+k;
-  // Use data attributes to avoid quote issues
-  const kgInp = document.createElement('input');
-  kgInp.className='sinput'; kgInp.type='number'; kgInp.step='0.5'; kgInp.min='0';
-  kgInp.inputMode='decimal'; kgInp.placeholder='kg'; kgInp.id='sw_'+k;
-  kgInp.oninput = function(){qSave(uid,di,ei,si,'weight',this.value);};
-  const repInp = document.createElement('input');
-  repInp.className='sinput'; repInp.type='text'; repInp.placeholder='rep'; repInp.id='sr2_'+k;
-  repInp.oninput = function(){qSave(uid,di,ei,si,'reps',this.value);};
-  const chkBtn = document.createElement('button');
-  chkBtn.className='chk-btn'; chkBtn.id='cb_'+k; chkBtn.textContent='O';
-  chkBtn.onclick = function(){toggleSet(uid,di,ei,si,ex.restSec);};
-  const numDiv = document.createElement('div');
-  numDiv.className='snum'; numDiv.textContent=ex.sets;
-  newRow.appendChild(numDiv);
-  newRow.appendChild(kgInp);
-  newRow.appendChild(repInp);
-  newRow.appendChild(chkBtn);
-  const lastChild = setArea.lastElementChild;
-  setArea.insertBefore(newRow, lastChild);
-  const mp = document.getElementById('mp_'+di+'_'+ei);
-  if(mp){let done=0;for(let s=0;s<ex.sets;s++){if(setCache[uid+'_'+di+'_'+ei+'_'+s]&&setCache[uid+'_'+di+'_'+ei+'_'+s].done)done++;}mp.textContent=done+'/'+ex.sets;}
+  const dbId = setCache[k]?.db_id;
+  if(dbId){
+    await sb.from('workout_sets').delete().eq('id', dbId);
+  } else {
+    await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', di).eq('exercise_index', ei).eq('set_index', si);
+  }
+  delete setCache[k];
+  ex.sets -= 1;
+  await saveProgram(uid);
+  renderDayContent(di);
 }
 
 
@@ -2441,6 +2437,25 @@ const FOOD_DB = {
   'hindistan cevizi':{kcal:354,protein:3.3,carb:15,  fat:33,  per:100, unit:'gram'},
 };
 
+// ── CUSTOM FOOD DB (kullanıcının kaydettiği/AI'dan öğrenilen besinler, cihaz genelinde kalıcı) ──
+let customFoodDB = {};
+
+function loadCustomFoodDB(uid){
+  if(!uid) return;
+  try{
+    const raw = localStorage.getItem('customFoodDB_'+uid);
+    customFoodDB = raw ? JSON.parse(raw) : {};
+    Object.assign(FOOD_DB, customFoodDB);
+  }catch(e){ console.error('loadCustomFoodDB error:', e); customFoodDB = {}; }
+}
+
+function rememberFood(uid, name, entry){
+  if(!uid || !name) return;
+  FOOD_DB[name] = entry;
+  customFoodDB[name] = entry;
+  try{ localStorage.setItem('customFoodDB_'+uid, JSON.stringify(customFoodDB)); }catch(e){ console.error('persist customFoodDB error:', e); }
+}
+
 async function autoLookupFood(mi, fi, name) {
   if(!name || name.length < 2) return;
   const key = name.toLowerCase().trim();
@@ -2519,7 +2534,9 @@ async function autoLookupFood(mi, fi, name) {
     if(!food.kcal) food.kcal = String(result.kcal || '');
     if(!food.protein) food.protein = String(result.protein || '');
     if(!food.carb) food.carb = String(result.carb || '');
+    if(!food.fat) food.fat = String(result.fat || '');
     if(!food.amount) food.amount = String(result.per || 100);
+    if(result.kcal) rememberFood(activeProfile()?.id, key, {kcal:result.kcal||0, protein:result.protein||0, carb:result.carb||0, fat:result.fat||0, per:result.per||100, unit:result.unit||'gram'});
     saveNutrition(activeProfile()?.id, curNutDate);
     renderNutrition();
   } catch(e) {
@@ -2707,7 +2724,7 @@ function renderProfileEditCard(p){
       </select>
     </div>
     <div class="prof-field"><label>Haftada Kaç Gün Antrenman?</label>
-      <select class="prof-input" id="pf_days">
+      <select class="prof-input" id="pf_days" onchange="updateTrainingDays(this.value)">
         <option value="3" ${(p.trainingDays||'4')==='3'?'selected':''}>3 gün</option>
         <option value="4" ${(p.trainingDays||'4')==='4'?'selected':''}>4 gün</option>
         <option value="5" ${(p.trainingDays||'4')==='5'?'selected':''}>5 gün</option>
@@ -2715,6 +2732,14 @@ function renderProfileEditCard(p){
       </select>
     </div>
   </div>`;
+}
+
+function updateTrainingDays(val){
+  const p = activeProfile();
+  if(!p) return;
+  p.trainingDays = val;
+  p.splitType = null; // gün sayısı değişince split'i yeniden sordur
+  renderAutoProgCard(p);
 }
 
 function renderGoalCard(p){
@@ -2768,7 +2793,10 @@ function toggleMuscleGoal(id){
 
 // Store editable program suggestion
 let editableProg = null;
+let currentSplitOptions = [];
+let currentSplitId = null;
 
+// Sihirbaz akışı: 1) Ana Hedef → 2) Haftada kaç gün → 3) Hangi split → 4) Program önizleme
 function renderAutoProgCard(p){
   const el = document.getElementById('autoProgCard');
   if(!el) return;
@@ -2776,10 +2804,72 @@ function renderAutoProgCard(p){
     el.innerHTML = '<div class="prof-section" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;padding:20px">Hedef seç → otomatik program önerisi gelecek</div>';
     return;
   }
+  if(!p.trainingDays){
+    el.innerHTML = `<div class="prof-section" style="text-align:center">
+      <h3 style="margin-bottom:12px">📅 Haftada Kaç Gün Antrenman Yapmak İstiyorsun?</h3>
+      <div class="goals-grid">
+        ${[3,4,5,6].map(n=>`<button class="goal-btn" onclick="chooseTrainingDays(${n})">
+          <div style="font-size:16px;font-weight:700">${n} Gün</div>
+        </button>`).join('')}
+      </div>
+    </div>`;
+    return;
+  }
+  const days = parseInt(p.trainingDays)||4;
+  const options = SPLIT_LIBRARY[days] || SPLIT_LIBRARY[4];
+  if(!p.splitType || !options.find(o=>o.id===p.splitType)){
+    el.innerHTML = `<div class="prof-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h3 style="margin:0">🏋️ Hangi Split'i İstersin?</h3>
+        <button class="btn btn-outline btn-sm" onclick="changeTrainingDaysStep()">← Gün Sayısı</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Haftada ${days} gün için uygun split'ler</div>
+      ${options.map(o=>`<button class="goal-btn" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px" onclick="setSplitType('${o.id}')">
+        <div style="font-size:13px;font-weight:600;margin-bottom:3px">${o.label}</div>
+        <div style="font-size:10px;opacity:.7;font-weight:400">${o.desc}</div>
+      </button>`).join('')}
+    </div>`;
+    return;
+  }
   const prog = generateProgramSuggestion(p);
+  currentSplitOptions = prog.options;
+  currentSplitId = prog.splitId;
   // Generate full program and store as editable
   editableProg = generateFullProgram(p, prog);
   renderEditableProg(prog.desc);
+}
+
+function chooseTrainingDays(n){
+  const p = activeProfile();
+  if(!p) return;
+  p.trainingDays = String(n);
+  p.splitType = null;
+  const sel = document.getElementById('pf_days');
+  if(sel) sel.value = String(n);
+  renderAutoProgCard(p);
+}
+
+function changeTrainingDaysStep(){
+  const p = activeProfile();
+  if(!p) return;
+  p.trainingDays = null;
+  p.splitType = null;
+  renderAutoProgCard(p);
+}
+
+function changeSplitStep(){
+  const p = activeProfile();
+  if(!p) return;
+  p.splitType = null;
+  renderAutoProgCard(p);
+}
+
+function setSplitType(id){
+  const p = activeProfile();
+  if(!p) return;
+  p.splitType = id;
+  try{ localStorage.setItem('splitType_'+p.id, id); }catch(e){ console.error('splitType persist error:', e); }
+  renderAutoProgCard(p);
 }
 
 
@@ -2806,6 +2896,14 @@ function lookupMuscleForEditable(name, di, ei){
 function renderEditableProg(desc){
   const el = document.getElementById('autoProgCard');
   if(!el||!editableProg) return;
+  const chosen = (currentSplitOptions||[]).find(o=>o.id===currentSplitId);
+  const splitSelector = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+    <div style="font-size:12px;color:var(--acc);font-weight:700">${chosen?chosen.label:''}</div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-sm" onclick="changeSplitStep()">🔁 Split Değiştir</button>
+      <button class="btn btn-outline btn-sm" onclick="changeTrainingDaysStep()">📅 Gün Değiştir</button>
+    </div>
+  </div>`;
   const rows = editableProg.map((day,di)=>{
     const isRest = day.type==='rest'||day.type==='hiit';
     const exList = isRest ? '' : day.exercises.map((ex,ei)=>`
@@ -2844,6 +2942,7 @@ function renderEditableProg(desc){
 
   el.innerHTML = '<div class="prof-section">'
     + '<h3>⚡ Önerilen Program <span style="font-size:9px;color:var(--muted);font-weight:400;text-transform:none">— düzenleyebilirsin</span></h3>'
+    + splitSelector
     + (desc?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+desc+'</div>':'')
     + rows
     + '<button class="btn btn-acc" style="width:100%;margin-top:4px" onclick="applyEditableProgram()">🚀 Bu Programı Uygula</button>'
@@ -2866,101 +2965,123 @@ async function applyEditableProgram(){
   setTimeout(()=>t.remove(),3000);
 }
 
+// Gün sayısına göre seçilebilir split kütüphanesi — her gün sayısı için birden fazla
+// gerçek, isimli split (Full Body, Upper/Lower, PPL, Bro Split...) ve manuel seçim imkanı.
+const SPLIT_LIBRARY = {
+  3: [
+    {id:'full_body', label:'Full Body', desc:'Her antrenmanda tüm kas grupları çalışılır — haftada 3 gün için en yüksek frekans.', build:(goal)=>[
+      {day:'Pzt',content:'Full Vücut A'},{day:'Sal',content:'Dinlenme'},
+      {day:'Çar',content:'Full Vücut B'},{day:'Per',content:'Dinlenme'},
+      {day:'Cum',content:'Full Vücut C'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'ppl', label:'Push / Pull / Legs', desc:'İtiş, çekiş ve bacak günleri ayrılır — klasik 3 günlük split.', build:(goal)=>[
+      {day:'Pzt',content:'Göğüs + Triceps'},{day:'Sal',content:'Dinlenme'},
+      {day:'Çar',content:'Sırt + Biceps'},{day:'Per',content:'Dinlenme'},
+      {day:'Cum',content:'Bacak + Omuz'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+  ],
+  4: [
+    {id:'upper_lower', label:'Upper / Lower', desc:'Üst ve alt vücut ayrı günlerde, haftada 2 tekrar — güç ve hacim dengesi.', build:(goal)=>[
+      {day:'Pzt',content:'Üst Vücut'},{day:'Sal',content:'Alt Vücut A'},
+      {day:'Çar',content:'Dinlenme'},{day:'Per',content:'Üst Vücut + Kol'},
+      {day:'Cum',content:'Alt Vücut B'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'ppl_plus', label:'Push / Pull / Legs+', desc:'İtiş, çekiş, bacak ve omuz+kol günleriyle klasik 4 günlük split.', build:(goal)=>[
+      {day:'Pzt',content:'Göğüs + Triceps'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Dinlenme'},{day:'Per',content:'Bacak'},
+      {day:'Cum',content:'Omuz + Kol'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'glute_focus', label:'Glute Odaklı', desc:'Kalça ve alt vücut hacmi öne çıkarılır.', build:(goal)=>[
+      {day:'Pzt',content:'Glute Heavy'},{day:'Sal',content:'Üst Vücut'},
+      {day:'Çar',content:'Dinlenme'},{day:'Per',content:'Glute Pump + Quad'},
+      {day:'Cum',content:'Üst Vücut + Kol'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+  ],
+  5: [
+    {id:'bro_split', label:'Bro Split', desc:'Her gün ayrı bir kas grubuna odaklanılır — göğüs, sırt, bacak, omuz, kol.', build:(goal)=>[
+      {day:'Pzt',content:'Göğüs + Triceps'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Bacak'},{day:'Per',content:'Omuz'},
+      {day:'Cum',content:'Kol + Karın'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'ppl_ul', label:'PPL + Upper/Lower', desc:'Push/Pull/Legs ardından üst-alt vücut günleriyle tamamlanır.', build:(goal)=>[
+      {day:'Pzt',content:'Göğüs + Triceps'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Bacak'},{day:'Per',content:'Üst Vücut'},
+      {day:'Cum',content:'Alt Vücut A'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'glute_focus', label:'Glute Odaklı', desc:'Kalça hacmi haftada 2 kez, üst vücut destekleyici.', build:(goal)=>[
+      {day:'Pzt',content:'Glute Heavy'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Üst Vücut'},{day:'Per',content:'Glute Pump + Quad'},
+      {day:'Cum',content:'Üst Vücut + Kol'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+  ],
+  6: [
+    {id:'ppl_x2', label:'Push / Pull / Legs x2', desc:'İtiş-çekiş-bacak döngüsü haftada 2 kez tekrarlanır.', build:(goal)=>[
+      {day:'Pzt',content:'Göğüs + Triceps'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Bacak'},{day:'Per',content:'Omuz + Kol'},
+      {day:'Cum',content:'Sırt + Biceps'},{day:'Cmt',content:'Bacak'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'bro_split', label:'Bro Split (Genişletilmiş)', desc:'Her kas grubuna kendi günü — ekstra kol+karın günüyle.', build:(goal)=>[
+      {day:'Pzt',content:'Göğüs + Triceps'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Bacak'},{day:'Per',content:'Omuz'},
+      {day:'Cum',content:'Kol + Karın'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Aktif Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'glute_focus', label:'Glute Odaklı', desc:'Kalça haftada 2 kez, geri kalan günler destekleyici.', build:(goal)=>[
+      {day:'Pzt',content:'Glute Heavy'},{day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:'Üst Vücut'},{day:'Per',content:'Bacak + Omuz'},
+      {day:'Cum',content:'Kol + Karın'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Aktif Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+  ],
+};
+
+function defaultSplitId(days, p){
+  const goal = p.mainGoal||'muscle_gain';
+  const muscles = p.muscleGoals||[];
+  const hasGlute = muscles.includes('glute');
+  const hasFull = muscles.includes('full');
+  if(hasGlute && days>=4) return 'glute_focus';
+  if(days===3) return (hasFull||goal==='weight_loss') ? 'full_body' : 'ppl';
+  if(days===4) return 'upper_lower';
+  if(days===5) return 'bro_split';
+  return 'ppl_x2';
+}
+
 function generateProgramSuggestion(p){
   const days = parseInt(p.trainingDays)||4;
   const goal = p.mainGoal||'muscle_gain';
-  const muscles = p.muscleGoals||[];
-  const level = p.level||'beginner';
-  
-  const hasGlute = muscles.includes('glute');
-  const hasFull = muscles.includes('full');
-  
-  let desc, split, sets, reps, rest;
-  
+
+  let sets, reps, rest, intensityDesc;
   if(goal==='weight_loss' || goal==='toning'){
     sets='12-16'; reps='15-20'; rest='45-60sn';
-    desc='Yüksek tekrar, kısa dinlenme. Kalori yakımı maksimum.';
+    intensityDesc='Yüksek tekrar, kısa dinlenme. Kalori yakımı maksimum.';
   } else if(goal==='strength'){
     sets='15-20'; reps='3-6'; rest='2-3dk';
-    desc='Ağır yükler, uzun dinlenme. Güç odaklı.';
+    intensityDesc='Ağır yükler, uzun dinlenme. Güç odaklı.';
   } else if(goal==='endurance'){
     sets='10-15'; reps='15-25'; rest='30-45sn';
-    desc='Yüksek hacim, minimal dinlenme. Kondisyon odaklı.';
+    intensityDesc='Yüksek hacim, minimal dinlenme. Kondisyon odaklı.';
   } else {
     sets='12-20'; reps='6-12'; rest='90-120sn';
-    desc='Optimal hipertrofi aralığı. Kas büyümesi için ideal.';
+    intensityDesc='Optimal hipertrofi aralığı. Kas büyümesi için ideal.';
   }
-  
-  let dayArr = [];
-  const dayNames = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
-  
-  if(days===3){
-    if(hasFull||goal==='weight_loss'){
-      dayArr=[
-        {day:'Pzt',content:'Full Vücut A'},
-        {day:'Sal',content:'Dinlenme'},
-        {day:'Çar',content:'Full Vücut B'},
-        {day:'Per',content:'Dinlenme'},
-        {day:'Cum',content:'Full Vücut C'},
-        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-        {day:'Paz',content:'Dinlenme'},
-      ];
-    } else {
-      dayArr=[
-        {day:'Pzt',content:'Göğüs + Triceps'},
-        {day:'Sal',content:'Dinlenme'},
-        {day:'Çar',content:'Sırt + Biceps'},
-        {day:'Per',content:'Dinlenme'},
-        {day:'Cum',content:'Bacak + Omuz'},
-        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-        {day:'Paz',content:'Dinlenme'},
-      ];
-    }
-  } else if(days===4){
-    if(hasGlute){
-      dayArr=[
-        {day:'Pzt',content:'Glute Heavy + Hamstring'},
-        {day:'Sal',content:'Üst Vücut'},
-        {day:'Çar',content:'Dinlenme'},
-        {day:'Per',content:'Quad + Glute Pump'},
-        {day:'Cum',content:'Üst Vücut + Kol'},
-        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-        {day:'Paz',content:'Dinlenme'},
-      ];
-    } else {
-      dayArr=[
-        {day:'Pzt',content:'Göğüs + Triceps'},
-        {day:'Sal',content:'Sırt + Biceps'},
-        {day:'Çar',content:'Dinlenme'},
-        {day:'Per',content:'Bacak'},
-        {day:'Cum',content:'Omuz + Kol'},
-        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-        {day:'Paz',content:'Dinlenme'},
-      ];
-    }
-  } else if(days===5){
-    dayArr=[
-      {day:'Pzt',content:hasGlute?'Glute Heavy':'Göğüs'},
-      {day:'Sal',content:'Sırt + Biceps'},
-      {day:'Çar',content:hasGlute?'Üst Vücut':'Bacak'},
-      {day:'Per',content:hasGlute?'Glute Pump + Quad':'Omuz'},
-      {day:'Cum',content:hasGlute?'Üst Vücut + Kol':'Kol + Karın'},
-      {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-      {day:'Paz',content:'Dinlenme'},
-    ];
-  } else {
-    dayArr=[
-      {day:'Pzt',content:hasGlute?'Glute Heavy':'Göğüs'},
-      {day:'Sal',content:'Sırt + Biceps'},
-      {day:'Çar',content:hasGlute?'Üst Vücut':'Omuz'},
-      {day:'Per',content:'Bacak + ' + (hasGlute?'Glute Pump':'Hamstring')},
-      {day:'Cum',content:'Kol + Karın'},
-      {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Aktif Dinlenme'},
-      {day:'Paz',content:'Dinlenme'},
-    ];
-  }
-  
-  return {desc, days:dayArr, sets, reps, rest};
+
+  const options = SPLIT_LIBRARY[days] || SPLIT_LIBRARY[4];
+  const wantedId = (p.splitType && p.splitType!=='auto' && options.find(o=>o.id===p.splitType)) ? p.splitType : defaultSplitId(days, p);
+  const variant = options.find(o=>o.id===wantedId) || options[0];
+  const dayArr = variant.build(goal);
+  const desc = variant.desc + ' ' + intensityDesc;
+
+  return {desc, days:dayArr, sets, reps, rest, splitId:variant.id, options};
 }
 
 async function saveProfileAll(){
@@ -3030,7 +3151,8 @@ function generateFullProgram(p, suggestion){
   const hasArm = _mg.includes('arm');
   const _goal = p.mainGoal||'muscle_gain';
   
-  if((hasChest||hasShoulder||hasArm) && _goal==='muscle_gain' && parseInt(p.trainingDays||4)>=4){
+  const _wantsAuto = !p.splitType || p.splitType==='auto';
+  if(_wantsAuto && (hasChest||hasShoulder||hasArm) && _goal==='muscle_gain' && parseInt(p.trainingDays||4)===4){
     const weekDays = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
     const warmupDay1 = 'Band Pull Apart 2x20 · Face Pull 2x15 · Scapular Pull Up 2x10 · Push Up 2x15';
     return [
@@ -3141,6 +3263,41 @@ function generateFullProgram(p, suggestion){
       {name:'Reverse Pec Deck',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:null},
       {name:'Face Pull',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:null},
     ],
+    'Bacak + Omuz':[
+      {name:'Back Squat',muscle:'Quad · Glute',sets:4,reps:'8,8,6,6',restSec:150,tip:'Kalça geri'},
+      {name:'Romanian Deadlift',muscle:'Hamstring',sets:3,reps:reps,restSec:rest,tip:'3 sn eksentrik'},
+      {name:'Leg Press',muscle:'Quad',sets:3,reps:'12,10,10',restSec:90,tip:null},
+      {name:'Calf Raise',muscle:'Baldır',sets:3,reps:'15',restSec:45,tip:'Tam aşağı'},
+      {name:'Overhead Press',muscle:'Deltoid',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Cable Lateral Raise',muscle:'Lateral Delt',sets:3,reps:'15',restSec:60,tip:'Kablo'},
+    ],
+    'Omuz + Kol':[
+      {name:'Overhead Press',muscle:'Deltoid',sets:4,reps:'8,8,6,6',restSec:120,tip:null},
+      {name:'Cable Lateral Raise',muscle:'Lateral Delt',sets:4,reps:'15',restSec:60,tip:'Kablo'},
+      {name:'Barbell Curl',muscle:'Biceps',sets:3,reps:'12',restSec:60,tip:'Strict form'},
+      {name:'Overhead Triceps',muscle:'Triceps',sets:3,reps:'12',restSec:60,tip:'Uzun kafa'},
+      {name:'Rope Pushdown',muscle:'Triceps',sets:3,reps:'12,15',restSec:45,tip:null},
+    ],
+    'Kol + Karın':[
+      {name:'Barbell Curl',muscle:'Biceps',sets:3,reps:'10,10,8',restSec:60,tip:'Strict'},
+      {name:'Hammer Curl',muscle:'Brachialis · Biceps',sets:3,reps:'12',restSec:60,tip:null},
+      {name:'Rope Pushdown',muscle:'Triceps',sets:3,reps:'12,15',restSec:45,tip:null},
+      {name:'Overhead Triceps',muscle:'Triceps',sets:3,reps:'12',restSec:60,tip:null},
+      {name:'Cable Crunch',muscle:'Rectus Abdominis',sets:3,reps:'15',restSec:60,tip:null},
+      {name:'Hanging Leg Raise',muscle:'Alt Karın',sets:3,reps:'12',restSec:60,tip:null},
+    ],
+    'Alt Vücut A':[
+      {name:'Back Squat',muscle:'Quad · Glute',sets:4,reps:'8,8,6,6',restSec:150,tip:'Kalça geri'},
+      {name:'Leg Press',muscle:'Quad',sets:3,reps:'12,10,10',restSec:90,tip:null},
+      {name:'Leg Extension',muscle:'Quad',sets:3,reps:'15',restSec:60,tip:'Tepe noktada tut'},
+      {name:'Standing Calf Raise',muscle:'Baldır',sets:4,reps:'15',restSec:45,tip:'Tam aşağı'},
+    ],
+    'Alt Vücut B':[
+      {name:'Romanian Deadlift',muscle:'Hamstring · Glute',sets:4,reps:reps,restSec:rest,tip:'3 sn eksentrik'},
+      {name:'Bulgarian Split Squat',muscle:'Glute Max + Quad',sets:3,reps:'10,8,8',restSec:90,tip:'Derinliği koru'},
+      {name:'Seated Leg Curl',muscle:'Hamstring',sets:3,reps:'12',restSec:60,tip:'Seated > lying'},
+      {name:'Cable Crunch',muscle:'Karın',sets:3,reps:'15',restSec:60,tip:null},
+    ],
     'Full Vücut A':[
       {name:'Squat',muscle:'Quad · Glute',sets:3,reps:reps,restSec:rest,tip:null},
       {name:'Bench Press',muscle:'Göğüs',sets:3,reps:reps,restSec:rest,tip:null},
@@ -3176,7 +3333,7 @@ function generateFullProgram(p, suggestion){
     } else if(content==='HIIT'){
       prog.push({name:'HIIT',type:'hiit',day:dayName,warmup:null,exercises:[],hiit:{work:40,rest:20,rounds:8}});
     } else {
-      const exKey = Object.keys(SPLITS).find(k=>content.includes(k))||content;
+      const exKey = SPLITS[content] ? content : (Object.keys(SPLITS).find(k=>content.includes(k))||content);
       const exercises = SPLITS[exKey]||SPLITS['Full Vücut A'];
       const warmup = content.includes('Glute')||content.includes('Bacak')?'İncline Treadmill — 10 dk':null;
       prog.push({name:content,type:'full',day:dayName,warmup,exercises:[...exercises]});
@@ -3197,7 +3354,7 @@ async function saveFoodToDB(mi, fi){
   const fat = parseFloat(food.fat)||0;
   const amount = parseFloat(food.amount)||100;
   if(!kcal){alert('Önce kalori değerini gir!');return;}
-  FOOD_DB[name] = {kcal, protein, carb, fat, per:amount, unit:food.unit||'gram'};
+  rememberFood(activeProfile()?.id, name, {kcal, protein, carb, fat, per:amount, unit:food.unit||'gram'});
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:10px 18px;z-index:500;font-size:12px;color:#d4f53c';
   t.textContent='✅ '+food.name+' veritabanına eklendi!';
