@@ -2738,6 +2738,7 @@ function updateTrainingDays(val){
   const p = activeProfile();
   if(!p) return;
   p.trainingDays = val;
+  p.splitType = null; // gün sayısı değişince split'i yeniden sordur
   renderAutoProgCard(p);
 }
 
@@ -2795,11 +2796,39 @@ let editableProg = null;
 let currentSplitOptions = [];
 let currentSplitId = null;
 
+// Sihirbaz akışı: 1) Ana Hedef → 2) Haftada kaç gün → 3) Hangi split → 4) Program önizleme
 function renderAutoProgCard(p){
   const el = document.getElementById('autoProgCard');
   if(!el) return;
   if(!p.mainGoal){
     el.innerHTML = '<div class="prof-section" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;padding:20px">Hedef seç → otomatik program önerisi gelecek</div>';
+    return;
+  }
+  if(!p.trainingDays){
+    el.innerHTML = `<div class="prof-section" style="text-align:center">
+      <h3 style="margin-bottom:12px">📅 Haftada Kaç Gün Antrenman Yapmak İstiyorsun?</h3>
+      <div class="goals-grid">
+        ${[3,4,5,6].map(n=>`<button class="goal-btn" onclick="chooseTrainingDays(${n})">
+          <div style="font-size:16px;font-weight:700">${n} Gün</div>
+        </button>`).join('')}
+      </div>
+    </div>`;
+    return;
+  }
+  const days = parseInt(p.trainingDays)||4;
+  const options = SPLIT_LIBRARY[days] || SPLIT_LIBRARY[4];
+  if(!p.splitType || !options.find(o=>o.id===p.splitType)){
+    el.innerHTML = `<div class="prof-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h3 style="margin:0">🏋️ Hangi Split'i İstersin?</h3>
+        <button class="btn btn-outline btn-sm" onclick="changeTrainingDaysStep()">← Gün Sayısı</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Haftada ${days} gün için uygun split'ler</div>
+      ${options.map(o=>`<button class="goal-btn" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px" onclick="setSplitType('${o.id}')">
+        <div style="font-size:13px;font-weight:600;margin-bottom:3px">${o.label}</div>
+        <div style="font-size:10px;opacity:.7;font-weight:400">${o.desc}</div>
+      </button>`).join('')}
+    </div>`;
     return;
   }
   const prog = generateProgramSuggestion(p);
@@ -2808,6 +2837,31 @@ function renderAutoProgCard(p){
   // Generate full program and store as editable
   editableProg = generateFullProgram(p, prog);
   renderEditableProg(prog.desc);
+}
+
+function chooseTrainingDays(n){
+  const p = activeProfile();
+  if(!p) return;
+  p.trainingDays = String(n);
+  p.splitType = null;
+  const sel = document.getElementById('pf_days');
+  if(sel) sel.value = String(n);
+  renderAutoProgCard(p);
+}
+
+function changeTrainingDaysStep(){
+  const p = activeProfile();
+  if(!p) return;
+  p.trainingDays = null;
+  p.splitType = null;
+  renderAutoProgCard(p);
+}
+
+function changeSplitStep(){
+  const p = activeProfile();
+  if(!p) return;
+  p.splitType = null;
+  renderAutoProgCard(p);
 }
 
 function setSplitType(id){
@@ -2842,9 +2896,14 @@ function lookupMuscleForEditable(name, di, ei){
 function renderEditableProg(desc){
   const el = document.getElementById('autoProgCard');
   if(!el||!editableProg) return;
-  const splitSelector = (currentSplitOptions&&currentSplitOptions.length>1) ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-    ${currentSplitOptions.map(o=>`<button class="btn btn-sm ${o.id===currentSplitId?'btn-acc':'btn-outline'}" onclick="setSplitType('${o.id}')" title="${o.desc||''}">${o.label}</button>`).join('')}
-  </div>` : '';
+  const chosen = (currentSplitOptions||[]).find(o=>o.id===currentSplitId);
+  const splitSelector = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+    <div style="font-size:12px;color:var(--acc);font-weight:700">${chosen?chosen.label:''}</div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-sm" onclick="changeSplitStep()">🔁 Split Değiştir</button>
+      <button class="btn btn-outline btn-sm" onclick="changeTrainingDaysStep()">📅 Gün Değiştir</button>
+    </div>
+  </div>`;
   const rows = editableProg.map((day,di)=>{
     const isRest = day.type==='rest'||day.type==='hiit';
     const exList = isRest ? '' : day.exercises.map((ex,ei)=>`
