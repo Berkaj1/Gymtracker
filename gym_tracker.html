@@ -770,6 +770,7 @@ async function loadProfile() {
   }
   currentProfile = prof;
   viewingProfile = prof;
+  loadCustomFoodDB(currentProfile.id);
 
   // Admin: load all profiles
   if(isAdmin()) {
@@ -1158,7 +1159,12 @@ function buildExCard(ex, di, ei) {
   </div>
   <div class="set-area">
     <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div></div></div>
-    ${setRows}${editArea}
+    ${setRows}
+    ${canEdit()?`<div style="display:flex;gap:6px;padding:6px 14px 4px">
+      <button class="btn btn-outline btn-sm" style="flex:1" onclick="addSetToEx('${uid}',${di},${ei})">+ Set Ekle</button>
+      ${ex.sets>1?`<button class="btn btn-outline btn-sm" style="flex:1;color:var(--acc2)" onclick="removeSetFromEx('${uid}',${di},${ei})">− Son Seti Sil</button>`:''}
+    </div>`:''}
+    ${editArea}
     <div class="ex-notes"><label>Egzersiz Notu</label>
       <textarea rows="1" placeholder="Genel not..." oninput="qSave('${uid}',${di},${ei},-1,'note',this.value)">${(setCache['exn_'+uid+'_'+di+'_'+ei]||'')}</textarea>
     </div>
@@ -1196,41 +1202,30 @@ async function toggleSet(uid,di,ei,si,rs){
 }
 
 
-function addExtraSet(uid, di, ei){
-  const prog = activeProgram();
-  if(!prog[di]||!prog[di].exercises[ei]) return;
-  const ex = prog[di].exercises[ei];
+async function addSetToEx(uid, di, ei){
+  const ex = activeProgram()[di]?.exercises[ei];
+  if(!ex) return;
   ex.sets += 1;
+  await saveProgram(uid);
+  renderDayContent(di);
+}
+
+async function removeSetFromEx(uid, di, ei){
+  const ex = activeProgram()[di]?.exercises[ei];
+  if(!ex || ex.sets<=1) return;
+  if(!confirm('Son set silinsin mi?')) return;
   const si = ex.sets - 1;
   const k = uid+'_'+di+'_'+ei+'_'+si;
-  const card = document.getElementById('ec_'+di+'_'+ei);
-  if(!card) return;
-  const setArea = card.querySelector('.set-area');
-  if(!setArea) return;
-  const newRow = document.createElement('div');
-  newRow.className = 'set-row';
-  newRow.id = 'sr_'+k;
-  // Use data attributes to avoid quote issues
-  const kgInp = document.createElement('input');
-  kgInp.className='sinput'; kgInp.type='number'; kgInp.step='0.5'; kgInp.min='0';
-  kgInp.inputMode='decimal'; kgInp.placeholder='kg'; kgInp.id='sw_'+k;
-  kgInp.oninput = function(){qSave(uid,di,ei,si,'weight',this.value);};
-  const repInp = document.createElement('input');
-  repInp.className='sinput'; repInp.type='text'; repInp.placeholder='rep'; repInp.id='sr2_'+k;
-  repInp.oninput = function(){qSave(uid,di,ei,si,'reps',this.value);};
-  const chkBtn = document.createElement('button');
-  chkBtn.className='chk-btn'; chkBtn.id='cb_'+k; chkBtn.textContent='O';
-  chkBtn.onclick = function(){toggleSet(uid,di,ei,si,ex.restSec);};
-  const numDiv = document.createElement('div');
-  numDiv.className='snum'; numDiv.textContent=ex.sets;
-  newRow.appendChild(numDiv);
-  newRow.appendChild(kgInp);
-  newRow.appendChild(repInp);
-  newRow.appendChild(chkBtn);
-  const lastChild = setArea.lastElementChild;
-  setArea.insertBefore(newRow, lastChild);
-  const mp = document.getElementById('mp_'+di+'_'+ei);
-  if(mp){let done=0;for(let s=0;s<ex.sets;s++){if(setCache[uid+'_'+di+'_'+ei+'_'+s]&&setCache[uid+'_'+di+'_'+ei+'_'+s].done)done++;}mp.textContent=done+'/'+ex.sets;}
+  const dbId = setCache[k]?.db_id;
+  if(dbId){
+    await sb.from('workout_sets').delete().eq('id', dbId);
+  } else {
+    await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', di).eq('exercise_index', ei).eq('set_index', si);
+  }
+  delete setCache[k];
+  ex.sets -= 1;
+  await saveProgram(uid);
+  renderDayContent(di);
 }
 
 
@@ -2441,6 +2436,25 @@ const FOOD_DB = {
   'hindistan cevizi':{kcal:354,protein:3.3,carb:15,  fat:33,  per:100, unit:'gram'},
 };
 
+// ── CUSTOM FOOD DB (kullanıcının kaydettiği/AI'dan öğrenilen besinler, cihaz genelinde kalıcı) ──
+let customFoodDB = {};
+
+function loadCustomFoodDB(uid){
+  if(!uid) return;
+  try{
+    const raw = localStorage.getItem('customFoodDB_'+uid);
+    customFoodDB = raw ? JSON.parse(raw) : {};
+    Object.assign(FOOD_DB, customFoodDB);
+  }catch(e){ console.error('loadCustomFoodDB error:', e); customFoodDB = {}; }
+}
+
+function rememberFood(uid, name, entry){
+  if(!uid || !name) return;
+  FOOD_DB[name] = entry;
+  customFoodDB[name] = entry;
+  try{ localStorage.setItem('customFoodDB_'+uid, JSON.stringify(customFoodDB)); }catch(e){ console.error('persist customFoodDB error:', e); }
+}
+
 async function autoLookupFood(mi, fi, name) {
   if(!name || name.length < 2) return;
   const key = name.toLowerCase().trim();
@@ -2519,7 +2533,9 @@ async function autoLookupFood(mi, fi, name) {
     if(!food.kcal) food.kcal = String(result.kcal || '');
     if(!food.protein) food.protein = String(result.protein || '');
     if(!food.carb) food.carb = String(result.carb || '');
+    if(!food.fat) food.fat = String(result.fat || '');
     if(!food.amount) food.amount = String(result.per || 100);
+    if(result.kcal) rememberFood(activeProfile()?.id, key, {kcal:result.kcal||0, protein:result.protein||0, carb:result.carb||0, fat:result.fat||0, per:result.per||100, unit:result.unit||'gram'});
     saveNutrition(activeProfile()?.id, curNutDate);
     renderNutrition();
   } catch(e) {
@@ -2707,7 +2723,7 @@ function renderProfileEditCard(p){
       </select>
     </div>
     <div class="prof-field"><label>Haftada Kaç Gün Antrenman?</label>
-      <select class="prof-input" id="pf_days">
+      <select class="prof-input" id="pf_days" onchange="updateTrainingDays(this.value)">
         <option value="3" ${(p.trainingDays||'4')==='3'?'selected':''}>3 gün</option>
         <option value="4" ${(p.trainingDays||'4')==='4'?'selected':''}>4 gün</option>
         <option value="5" ${(p.trainingDays||'4')==='5'?'selected':''}>5 gün</option>
@@ -2715,6 +2731,13 @@ function renderProfileEditCard(p){
       </select>
     </div>
   </div>`;
+}
+
+function updateTrainingDays(val){
+  const p = activeProfile();
+  if(!p) return;
+  p.trainingDays = val;
+  renderAutoProgCard(p);
 }
 
 function renderGoalCard(p){
@@ -2873,8 +2896,7 @@ function generateProgramSuggestion(p){
   const level = p.level||'beginner';
   
   const hasGlute = muscles.includes('glute');
-  const hasFull = muscles.includes('full');
-  
+
   let desc, split, sets, reps, rest;
   
   if(goal==='weight_loss' || goal==='toning'){
@@ -2895,27 +2917,17 @@ function generateProgramSuggestion(p){
   const dayNames = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
   
   if(days===3){
-    if(hasFull||goal==='weight_loss'){
-      dayArr=[
-        {day:'Pzt',content:'Full Vücut A'},
-        {day:'Sal',content:'Dinlenme'},
-        {day:'Çar',content:'Full Vücut B'},
-        {day:'Per',content:'Dinlenme'},
-        {day:'Cum',content:'Full Vücut C'},
-        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-        {day:'Paz',content:'Dinlenme'},
-      ];
-    } else {
-      dayArr=[
-        {day:'Pzt',content:'Göğüs + Triceps'},
-        {day:'Sal',content:'Dinlenme'},
-        {day:'Çar',content:'Sırt + Biceps'},
-        {day:'Per',content:'Dinlenme'},
-        {day:'Cum',content:'Bacak + Omuz'},
-        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
-        {day:'Paz',content:'Dinlenme'},
-      ];
-    }
+    // Haftada 3 gün için en verimli seçenek Full Body (her kas grubu haftada 3x uyarılır)
+    dayArr=[
+      {day:'Pzt',content:'Full Vücut A'},
+      {day:'Sal',content:'Dinlenme'},
+      {day:'Çar',content:'Full Vücut B'},
+      {day:'Per',content:'Dinlenme'},
+      {day:'Cum',content:'Full Vücut C'},
+      {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ];
+    desc='Haftada 3 gün için Full Body en verimli seçim — her kas grubunu haftada 3 kez çalıştırır. ' + desc;
   } else if(days===4){
     if(hasGlute){
       dayArr=[
@@ -3197,7 +3209,7 @@ async function saveFoodToDB(mi, fi){
   const fat = parseFloat(food.fat)||0;
   const amount = parseFloat(food.amount)||100;
   if(!kcal){alert('Önce kalori değerini gir!');return;}
-  FOOD_DB[name] = {kcal, protein, carb, fat, per:amount, unit:food.unit||'gram'};
+  rememberFood(activeProfile()?.id, name, {kcal, protein, carb, fat, per:amount, unit:food.unit||'gram'});
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:10px 18px;z-index:500;font-size:12px;color:#d4f53c';
   t.textContent='✅ '+food.name+' veritabanına eklendi!';
