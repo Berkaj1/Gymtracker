@@ -2985,10 +2985,10 @@ async function applyEditableProgram(){
 // gerçek, isimli split (Full Body, Upper/Lower, PPL, Bro Split...) ve manuel seçim imkanı.
 const SPLIT_LIBRARY = {
   3: [
-    {id:'full_body', label:'Full Body', desc:'Her antrenmanda tüm kas grupları çalışılır — haftada 3 gün için en yüksek frekans.', build:(goal)=>[
+    {id:'full_body', label:'Full Body A/B', desc:'Kişiye özel Full Body A/B programı — A günü Pazartesi ve Cuma, B günü Çarşamba çalışılır.', build:(goal)=>[
       {day:'Pzt',content:'Full Vücut A'},{day:'Sal',content:'Dinlenme'},
       {day:'Çar',content:'Full Vücut B'},{day:'Per',content:'Dinlenme'},
-      {day:'Cum',content:'Full Vücut C'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Cum',content:'Full Vücut A'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
       {day:'Paz',content:'Dinlenme'},
     ]},
     {id:'ppl', label:'Push / Pull / Legs', desc:'İtiş, çekiş ve bacak günleri ayrılır — klasik 3 günlük split.', build:(goal)=>[
@@ -3315,25 +3315,26 @@ function generateFullProgram(p, suggestion){
       {name:'Cable Crunch',muscle:'Karın',sets:3,reps:'15',restSec:60,tip:null},
     ],
     'Full Vücut A':[
-      {name:'Squat',muscle:'Quad · Glute',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Bench Press',muscle:'Göğüs',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Lat Pulldown',muscle:'Sırt',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Shoulder Press',muscle:'Omuz',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Plank',muscle:'Core',sets:3,reps:'45sn',restSec:60,tip:null},
+      {name:'Hip Thrust',muscle:'Glute Maximus',sets:4,reps:'8-10',restSec:120,tip:null},
+      {name:'Leg Press (yüksek ayak)',muscle:'Quadriceps · Glute',sets:3,reps:'8-10',restSec:90,tip:null},
+      {name:'Incline Barbell Press',muscle:'Pectoral (Üst)',sets:4,reps:'6-8',restSec:120,tip:null},
+      {name:'Weighted Pull Up',muscle:'Latissimus · Biceps',sets:3,reps:'6-10',restSec:90,tip:null},
+      {name:'DB Lateral Raise (yaslanarak)',muscle:'Lateral Deltoid',sets:4,reps:'12-15',restSec:60,tip:null},
+      {name:'Incline DB Curl',muscle:'Biceps (Uzun Kafa)',sets:3,reps:'10-12',restSec:60,tip:null},
+      {name:'Hammer Curl',muscle:'Brachialis · Biceps',sets:3,reps:'10-12',restSec:60,tip:null},
+      {name:'Overhead Cable Triceps',muscle:'Triceps (Uzun Kafa)',sets:3,reps:'10-12',restSec:60,tip:null},
+      {name:'Rope Pushdown',muscle:'Triceps (Lateral)',sets:3,reps:'12-15',restSec:45,tip:null},
     ],
     'Full Vücut B':[
-      {name:'Romanian Deadlift',muscle:'Hamstring · Glute',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Incline Press',muscle:'Göğüs',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Cable Row',muscle:'Sırt',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Lateral Raise',muscle:'Omuz',sets:3,reps:'15',restSec:60,tip:null},
-      {name:'Cable Crunch',muscle:'Karın',sets:3,reps:'15',restSec:60,tip:null},
-    ],
-    'Full Vücut C':[
-      {name:'Leg Press',muscle:'Quad · Glute',sets:3,reps:reps,restSec:rest,tip:null},
-      {name:'Dip',muscle:'Göğüs · Triceps',sets:3,reps:'AMRAP',restSec:90,tip:null},
-      {name:'Pull-Up',muscle:'Sırt',sets:3,reps:'AMRAP',restSec:90,tip:null},
-      {name:'Face Pull',muscle:'Omuz',sets:3,reps:'15',restSec:60,tip:null},
-      {name:'Hanging Leg Raise',muscle:'Karın',sets:3,reps:'12',restSec:60,tip:null},
+      {name:'Romanian Deadlift',muscle:'Hamstring · Glute',sets:4,reps:'8-10',restSec:120,tip:null},
+      {name:'Hip Abduction',muscle:'Glute Medius',sets:4,reps:'15-20',restSec:60,tip:null},
+      {name:'Cable Kickback',muscle:'Glute Maximus',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Chest Supported Row',muscle:'Rhomboids · Mid Back',sets:4,reps:'8-10',restSec:90,tip:null},
+      {name:'Weighted Dip',muscle:'Alt Pectoral · Triceps',sets:3,reps:'6-10',restSec:90,tip:null},
+      {name:'Face Pull',muscle:'Rear Deltoid · Trapezius',sets:4,reps:'15-20',restSec:60,tip:null},
+      {name:'DB Lateral Raise',muscle:'Lateral Deltoid',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Bayesian Cable Curl',muscle:'Biceps (Uzun Kafa)',sets:3,reps:'10-12',restSec:60,tip:null},
+      {name:'Reverse Curl',muscle:'Brachialis · Brachioradialis',sets:3,reps:'12-15',restSec:60,tip:null},
     ],
     'HIIT':[],
   };
