@@ -2873,24 +2873,35 @@ function setSplitType(id){
 }
 
 
-function lookupMuscleForEditable(name, di, ei){
-  if(!name || name.length < 2) return;
-  const q = name.toLowerCase().trim();
-  // Check EXERCISE_DB first
-  const found = EXERCISE_DB.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()));
-  if(found && editableProg[di] && editableProg[di].exercises[ei]){
-    editableProg[di].exercises[ei].muscle = found.muscle;
-    const el = document.getElementById('em_'+di+'_'+ei);
-    if(el) el.textContent = found.muscle;
-    return;
-  }
-  // Check FOOD... no, check EXERCISE_DB by partial
-  const partialMatch = EXERCISE_DB.find(e => e.name.toLowerCase().startsWith(q.substring(0,4)));
-  if(partialMatch && editableProg[di] && editableProg[di].exercises[ei]){
-    editableProg[di].exercises[ei].muscle = partialMatch.muscle;
-    const el = document.getElementById('em_'+di+'_'+ei);
-    if(el) el.textContent = partialMatch.muscle;
-  }
+function filterEditableExSugg(query, di, ei){
+  const sugg = document.getElementById('epsugg_'+di+'_'+ei);
+  if(!sugg) return;
+  if(!query || query.length < 2){ sugg.style.display='none'; return; }
+  const q = query.toLowerCase().trim();
+  const matches = EXERCISE_DB.filter(e => e.name.toLowerCase().includes(q) || e.muscle.toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length){ sugg.style.display='none'; return; }
+  window._epMatches = window._epMatches || {};
+  window._epMatches[di+'_'+ei] = matches;
+  sugg.style.display = 'block';
+  sugg.innerHTML = matches.map((e,i)=>`
+    <div onclick="selectEditableEx(${di},${ei},${i})" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05)" onmouseover="this.style.background='rgba(212,245,60,.06)'" onmouseout="this.style.background='none'">
+      <div style="font-size:12px;font-weight:500;color:#f2f0e8">${e.name}</div>
+      <div style="font-size:10px;color:#555;margin-top:2px">${e.muscle}</div>
+    </div>`).join('');
+}
+
+function hideEditableExSugg(di, ei){
+  const sugg = document.getElementById('epsugg_'+di+'_'+ei);
+  if(sugg) sugg.style.display='none';
+}
+
+function selectEditableEx(di, ei, i){
+  const ex = window._epMatches && window._epMatches[di+'_'+ei] && window._epMatches[di+'_'+ei][i];
+  if(!ex || !editableProg[di] || !editableProg[di].exercises[ei]) return;
+  editableProg[di].exercises[ei].name = ex.name;
+  editableProg[di].exercises[ei].muscle = ex.muscle;
+  hideEditableExSugg(di, ei);
+  renderEditableProg();
 }
 
 function renderEditableProg(desc){
@@ -2909,10 +2920,15 @@ function renderEditableProg(desc){
     const exList = isRest ? '' : day.exercises.map((ex,ei)=>`
       <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:6px">
         <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center">
-          <input value="${ex.name}" 
-            onchange="editableProg[${di}].exercises[${ei}].name=this.value"
-            oninput="lookupMuscleForEditable(this.value,${di},${ei})"
-            style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0">
+          <div style="position:relative">
+            <input value="${ex.name}" id="epn_${di}_${ei}"
+              onchange="editableProg[${di}].exercises[${ei}].name=this.value"
+              oninput="filterEditableExSugg(this.value,${di},${ei})"
+              onblur="setTimeout(()=>hideEditableExSugg(${di},${ei}),200)"
+              autocomplete="off"
+              style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0;width:100%">
+            <div id="epsugg_${di}_${ei}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:200;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.6)"></div>
+          </div>
           <div style="text-align:center">
             <div style="font-size:8px;color:var(--muted);margin-bottom:2px">SET</div>
             <input type="number" min="1" max="8" value="${ex.sets}" onchange="editableProg[${di}].exercises[${ei}].sets=parseInt(this.value)"
