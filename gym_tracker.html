@@ -2997,6 +2997,12 @@ const SPLIT_LIBRARY = {
       {day:'Cum',content:'Bacak + Omuz'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
       {day:'Paz',content:'Dinlenme'},
     ]},
+    {id:'glute_focus', label:'Glute Odaklı (Hip/Hinge/Squat)', desc:'Kalça hacmini üç farklı hareket paterniyle maksimize eden kişiye özel program.', build:(goal)=>[
+      {day:'Pzt',content:'Hip Dominant'},{day:'Sal',content:'Dinlenme'},
+      {day:'Çar',content:'Hinge Dominant'},{day:'Per',content:'Dinlenme'},
+      {day:'Cum',content:'Squat Dominant'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
   ],
   4: [
     {id:'upper_lower', label:'Upper / Lower', desc:'Üst ve alt vücut ayrı günlerde, haftada 2 tekrar — güç ve hacim dengesi.', build:(goal)=>[
@@ -3065,7 +3071,7 @@ function defaultSplitId(days, p){
   const muscles = p.muscleGoals||[];
   const hasGlute = muscles.includes('glute');
   const hasFull = muscles.includes('full');
-  if(hasGlute && days>=4) return 'glute_focus';
+  if(hasGlute) return 'glute_focus';
   if(days===3) return (hasFull||goal==='weight_loss') ? 'full_body' : 'ppl';
   if(days===4) return 'upper_lower';
   if(days===5) return 'bro_split';
@@ -3335,6 +3341,36 @@ function generateFullProgram(p, suggestion){
       {name:'DB Lateral Raise',muscle:'Lateral Deltoid',sets:3,reps:'12-15',restSec:60,tip:null},
       {name:'Bayesian Cable Curl',muscle:'Biceps (Uzun Kafa)',sets:3,reps:'10-12',restSec:60,tip:null},
       {name:'Reverse Curl',muscle:'Brachialis · Brachioradialis',sets:3,reps:'12-15',restSec:60,tip:null},
+    ],
+    'Hip Dominant':[
+      {name:'Hip Thrust',muscle:'Glute Maximus',sets:4,reps:'8-10',restSec:120,tip:null},
+      {name:'Hip Abduction',muscle:'Glute Medius',sets:3,reps:'15-20',restSec:60,tip:null},
+      {name:'Leg Press (yüksek ayak)',muscle:'Quadriceps · Glute',sets:3,reps:'10-12',restSec:90,tip:null},
+      {name:'Lat Pulldown',muscle:'Latissimus Dorsi',sets:3,reps:'10-12',restSec:90,tip:null},
+      {name:'Seated Row',muscle:'Rhomboids · Trapezius',sets:3,reps:'10-12',restSec:90,tip:null},
+      {name:'Lateral Raise',muscle:'Lateral Deltoid',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Barbell Curl',muscle:'Biceps',sets:3,reps:'10-12',restSec:60,tip:null},
+      {name:'Triceps Push Down',muscle:'Triceps',sets:3,reps:'12-15',restSec:60,tip:null},
+    ],
+    'Hinge Dominant':[
+      {name:'Romanian Deadlift',muscle:'Hamstring · Glute',sets:4,reps:'8-10',restSec:120,tip:null},
+      {name:'Machine Kick Back',muscle:'Glute Maximus',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Roman Chair Back Extension',muscle:'Glute Maximus · Erector',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Seated Leg Curl',muscle:'Hamstring',sets:3,reps:'10-12',restSec:60,tip:null},
+      {name:'Lat Pulldown',muscle:'Latissimus Dorsi',sets:3,reps:'10-12',restSec:90,tip:null},
+      {name:'Face Pull',muscle:'Rear Deltoid · Trapezius',sets:3,reps:'15-20',restSec:60,tip:null},
+      {name:'Lateral Raise',muscle:'Lateral Deltoid',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Barbell Curl',muscle:'Biceps',sets:3,reps:'10-12',restSec:60,tip:null},
+    ],
+    'Squat Dominant':[
+      {name:'Bulgarian Split Squat',muscle:'Glute Max · Quad',sets:4,reps:'10-12',restSec:90,tip:null},
+      {name:'Sumo Squat',muscle:'Glute Medius · Quad',sets:3,reps:'12-15',restSec:90,tip:null},
+      {name:'Walking Lunge',muscle:'Glute Max · Quad',sets:3,reps:'12',restSec:60,tip:null},
+      {name:'Hip Abduction',muscle:'Glute Medius',sets:3,reps:'15-20',restSec:60,tip:null},
+      {name:'Chest Press',muscle:'Pectoral',sets:3,reps:'10-12',restSec:90,tip:null},
+      {name:'Shoulder Press',muscle:'Deltoid · Triceps',sets:3,reps:'10-12',restSec:90,tip:null},
+      {name:'Face Pull',muscle:'Rear Deltoid · Trapezius',sets:3,reps:'15-20',restSec:60,tip:null},
+      {name:'Overhead Triceps',muscle:'Triceps',sets:3,reps:'12-15',restSec:60,tip:null},
     ],
     'HIIT':[],
   };
