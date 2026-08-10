@@ -1141,7 +1141,13 @@ function buildExCard(ex, di, ei) {
       <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"O"}</button>
     </div>`;
   }
-  const editArea = editMode&&canEdit()?`<div class="ex-edit-area"><div class="edit-grid">
+  const exCount = activeProgram()[di]?.exercises.length||1;
+  const editArea = editMode&&canEdit()?`<div class="ex-edit-area">
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-outline btn-sm" style="flex:1" onclick="moveExercise(${di},${ei},-1)" ${ei===0?'disabled':''}>▲ Yukarı Taşı</button>
+      <button class="btn btn-outline btn-sm" style="flex:1" onclick="moveExercise(${di},${ei},1)" ${ei>=exCount-1?'disabled':''}>▼ Aşağı Taşı</button>
+    </div>
+    <div class="edit-grid">
     <div class="edit-field"><label>Egzersiz Adı</label><input class="edit-input" value="${ex.name}" onchange="ex.name=this.value;saveProgram(activeProfile().id)"></div>
     <div class="edit-field"><label>Kas Grubu</label><input class="edit-input" value="${ex.muscle}" onchange="ex.muscle=this.value;saveProgram(activeProfile().id)"></div>
     <div class="edit-field"><label>Set</label><input class="edit-input" type="number" min="1" max="10" value="${ex.sets}" onchange="ex.sets=parseInt(this.value)||1;saveProgram(activeProfile().id);renderDayContent(${di})"></div>
@@ -1322,6 +1328,33 @@ function delEx(di,ei){
   if(!confirm(`"${activeProgram()[di].exercises[ei].name}" silinsin mi?`))return;
   activeProgram()[di].exercises.splice(ei,1);
   saveProgram(activeProfile().id);renderDayContent(di);
+}
+
+async function moveExercise(di, ei, dir){
+  const uid = activeProfile()?.id;
+  const exList = activeProgram()[di]?.exercises;
+  const ej = ei + dir;
+  if(!exList || ej<0 || ej>=exList.length) return;
+  // 1) egzersiz sırasını değiştir
+  [exList[ei], exList[ej]] = [exList[ej], exList[ei]];
+  // 2) o iki index'e ait yerel set/not önbelleğini de değiştir (kayıtlı ağırlık/tekrar egzersizle birlikte gitsin)
+  for(let s=0;s<12;s++){
+    const ka=`${uid}_${di}_${ei}_${s}`, kb=`${uid}_${di}_${ej}_${s}`;
+    const tmp = setCache[ka];
+    if(setCache[kb]!==undefined) setCache[ka]=setCache[kb]; else delete setCache[ka];
+    if(tmp!==undefined) setCache[kb]=tmp; else delete setCache[kb];
+  }
+  const na=`exn_${uid}_${di}_${ei}`, nb=`exn_${uid}_${di}_${ej}`;
+  const tmpNote = setCache[na];
+  if(setCache[nb]!==undefined) setCache[na]=setCache[nb]; else delete setCache[na];
+  if(tmpNote!==undefined) setCache[nb]=tmpNote; else delete setCache[nb];
+  await saveProgram(uid);
+  // 3) Supabase'deki set kayitlarinin exercise_index'ini de karsilikli degistir (gecici deger uzerinden, unique cakismasini onlemek icin)
+  const TEMP = -999;
+  await sb.from('workout_sets').update({exercise_index:TEMP}).eq('user_id',uid).eq('day_index',di).eq('exercise_index',ei);
+  await sb.from('workout_sets').update({exercise_index:ei}).eq('user_id',uid).eq('day_index',di).eq('exercise_index',ej);
+  await sb.from('workout_sets').update({exercise_index:ej}).eq('user_id',uid).eq('day_index',di).eq('exercise_index',TEMP);
+  renderDayContent(di);
 }
 
 function addEx(di){
