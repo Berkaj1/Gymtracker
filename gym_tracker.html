@@ -2985,7 +2985,13 @@ async function applyEditableProgram(){
 // gerçek, isimli split (Full Body, Upper/Lower, PPL, Bro Split...) ve manuel seçim imkanı.
 const SPLIT_LIBRARY = {
   3: [
-    {id:'full_body', label:'Glute Baş Full Body', desc:'Kişiye özel Full Body A/B programı — A günü Pazartesi ve Cuma, B günü Çarşamba çalışılır.', build:(goal)=>[
+    {id:'full_body', label:'Full Body A/B', desc:'Kişiye özel Full Body A/B programı — A günü Pazartesi ve Cuma, B günü Çarşamba çalışılır.', build:(goal)=>[
+      {day:'Pzt',content:'Full Vücut A'},{day:'Sal',content:'Dinlenme'},
+      {day:'Çar',content:'Full Vücut B'},{day:'Per',content:'Dinlenme'},
+      {day:'Cum',content:'Full Vücut A'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ]},
+    {id:'glute_bas_full_body', label:'Glute Baş Full Body', desc:'Full Body A/B ile aynı program, glute öncelikli isimlendirmeyle — A günü Pazartesi ve Cuma, B günü Çarşamba çalışılır.', build:(goal)=>[
       {day:'Pzt',content:'Full Vücut A'},{day:'Sal',content:'Dinlenme'},
       {day:'Çar',content:'Full Vücut B'},{day:'Per',content:'Dinlenme'},
       {day:'Cum',content:'Full Vücut A'},{day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
